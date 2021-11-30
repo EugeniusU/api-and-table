@@ -192,8 +192,16 @@ function formatData(obj) {
             }
         }
 
+        let tags = leadObj['_embedded']['tags'].map(tag => tag.name);
         let contact = {name: contactObj.name, mail, phone};
-        let lead = {title: leadObj.name, price: leadObj.price, contact, user: userObj.name, createdAt: leadObj['created_at']};
+        let lead = {
+            title: leadObj.name, 
+            price: leadObj.price, 
+            contact, 
+            user: userObj.name, 
+            createdAt: leadObj['created_at'],
+            tags
+        };
 
         data.push(lead);
     }
