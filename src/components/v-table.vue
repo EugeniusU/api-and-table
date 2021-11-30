@@ -1,11 +1,11 @@
 <template>
     <div class='v-table'>
         <div class='header'>
-            <div>Название</div>
-            <div>Статус</div>
-            <div>Ответственный</div>
-            <div>Дата создания</div>
-            <div>Бюджет</div>
+            <div class='header_name'>Название</div>
+            <div class='header_name'>Статус</div>
+            <div class='header_name'>Ответственный</div>
+            <div class='header_name'>Дата создания</div>
+            <div class='header_name'>Бюджет</div>
         </div>
 
         <v-table-item
@@ -47,7 +47,7 @@ export default({
     display: flex;
     flex-direction: column;
     align-self: center;
-    width: 80%;
+    width: 90%;
     margin-top: 30px;
 }
 
@@ -55,9 +55,28 @@ export default({
     display: flex;
     width: 100%;
     justify-content: space-between;
+    border-bottom: 1px solid deeppink;
+    padding-bottom: 10px;
 }
 
-.header > div {
+.header_name {
     flex-basis: 20%;
 }
+
+.header_name:first-child {
+    flex-basis: 30%;
+}
+
+.header_name:last-child {
+    flex-basis: 10%;
+}
+
+.header_name:nth-child(4n) {
+    flex-basis: 10%;
+}
+
+.header_name:nth-child(3n) {
+    flex-basis: 10%;
+}
+
 </style>
