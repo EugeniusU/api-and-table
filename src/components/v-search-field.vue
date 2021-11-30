@@ -32,14 +32,10 @@ export default({
             if (query && query.length >= 3) {
                 this.GET_FILTRED_WITH_QUERY(query)
             } else if (!query.length || !query) {
-                console.log('this');
-                this.GET_DATA_FROM_API().then(console.log)
+               this.GET_DATA_FROM_API().then(console.log)
             }
-
-            console.log(query, query.length);
         }
-    },
-    computed: {}
+    }
 })
 </script>
 
