@@ -37,7 +37,7 @@ export default({
         ])
     },
     mounted() {
-        this.GET_DATA_FROM_API().then(console.log)
+       this.GET_DATA_FROM_API().then(console.log)
     }
 })
 </script>
