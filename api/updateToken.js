@@ -60,4 +60,4 @@ function rewriteNewToken() {
     req.end();
 }
 
-module.exports = rewriteNewToken;
+module.exports = {rewriteNewToken};
