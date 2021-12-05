@@ -3,12 +3,19 @@ const https = require('https');
 const http = require('http');
 const url = require('url');
 const rewriteNewToken = require('./updateToken').rewriteNewToken;
+const config = require('./config');
+const errors = require('./errors');
+
+let legend = {
+    'leads': config.leadsWithContacts,
+    'contacts': config.contacts,
+    'users': config.users,
+    'pipelines': config.pipelines
+};
 
 async function isTokenValid(fileName) {
-    let stat = await fs.promises.stat(fileName); //, (err, stats) => {
+    let stat = await fs.promises.stat(fileName);
     let day = 1000 * 60 * 60 * 23;  // one hour before update token, total 23 h in ms
-
-///    console.log(stat);
 
     if (stat.mtimeMs + day  > Date.now()) {
         return true;
@@ -28,34 +35,20 @@ async function isTokenValid(fileName) {
 let tokens = fs.readFileSync('./tokens2.json');
 let accessToken = JSON.parse(tokens)['access_token'];
 
-const domain = '';
-const path = '/api/v4/'
-
 const headers = {
 	'Content-Type': 'application/json',
 	'Authorization': `Bearer ${accessToken}`
 };
 
-const leads = `${domain}${path}leads`;
-const contacts = `${domain}${path}contacts`;
-const users = `${domain}${path}users`;
-const pipelines = `${domain}${path}leads/pipelines`;
-const leadsWithContacts = `${domain}${path}leads?with=contacts`;
-
 let pipelineID = async () => {
-    let res = await get(pipelines, headers);
+    let res = await get(config.pipelines, headers);
     return res['_embedded'].pipelines[0].id;
 }
 
-let leadsID = async () => {
-    let leadsArray = await get(leads, headers);
-    return leadsArray['_embedded'].leads.map(lead => lead['status_id']);
-}
-
-let statusesID = async () => {
+async function statusesID2(leads) {
     let id = await pipelineID();
-    let statusesId = await leadsID();
-    let path = `${pipelines}/${id}/statuses/`;
+    let statusesId = leads.map(lead => lead['status_id']);
+    let path = `${config.pipelines}/${id}/statuses/`;
 
     return Promise.all(statusesId.map(statusId => get(`${path}${statusId}`, headers)));
 }
@@ -112,28 +105,23 @@ function parseData(data, key) {
     return array;
 }
 
-async function getAll(legend, headers) {
+async function getAll2(legend, headers) {
     let obj = {};
 
-    for await (let key of Object.keys(legend)) {
-        try {
-            let data = await get(legend[key], headers);
-            obj[key] = parseData(data, key);
-        } catch (e) {
-            console.log(2);
-            console.log(e);
-        }
-    }
+    let keys = Object.keys(legend);
+///    console.log(keys);
+
+    let datas = Promise.all(keys.map(key => get(legend[key], headers)));
+    let result = await datas;
+
+    result.forEach((k, index) => {
+        let key = keys[index];
+///        console.log(key, 'key');
+        obj[key] = parseData(k, key);
+    })
 
     return obj;
 }
-
-let legend = {
-    'leads': leadsWithContacts,
-    'contacts': contacts,
-    'users': users,
-    'pipelines': pipelines
-};
 
 const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -149,7 +137,7 @@ const server = http.createServer((req, res) => {
         console.log(urlParsed);
         if (urlParsed.pathname == '/api/data' && urlParsed.query.query) {
             
-            let leadsWithQuery = leads + '?with=contacts&query=' + urlParsed.query.query;
+            let leadsWithQuery = config.leads + '?with=contacts&query=' + urlParsed.query.query;
             console.log(leadsWithQuery);
 
             let legendQuery = Object.assign({}, legend);
@@ -157,7 +145,8 @@ const server = http.createServer((req, res) => {
 
             sendData(res, legendQuery);
         } else {
-            res.end('forbidden');
+            let e = new errors.HttpError(403, 'forbidden');
+            res.end(e.toString());
         }
     }
 })
@@ -171,7 +160,7 @@ function formatData(obj) {
 
     for (let i = 0; i < obj.leads.length; i++) {
         let leadObj = obj.leads[i];
-        console.log(leadObj)
+///        console.log(leadObj)
 
         let userObj = obj.users.filter(user => user.id == leadObj['responsible_user_id'])[0];
         let contactID = leadObj['_embedded']['contacts'][0]['id'];
@@ -206,26 +195,36 @@ function formatData(obj) {
         data.push(lead);
     }
 
-    console.log(data);
+///    console.log(data);
 
     return data;
 }
 
 async function sendData(res, legend) {
-    let leadsStatuses = await statusesID(); 
-    let leadsStatusesObjs = leadsStatuses.map(status => {
-        return {name: status.name, color: status.color}
-    });
+    let result = [];
 
-    let allLeads = await getAll(legend, headers);
-    let formatted = formatData(allLeads);
-    let mixed = formatted.map((obj, index) => {
-        obj['statusName'] = leadsStatusesObjs[index].name
-        obj['statusColor'] = leadsStatusesObjs[index].color
-        return obj;
-    });
-            
-    console.log(mixed);
+    try {
+        let allLeads = await getAll2(legend, headers);
 
-    res.end(JSON.stringify(mixed));
+        let leadsStatuses = await statusesID2(allLeads.leads);
+        let leadsStatusesObjs = leadsStatuses.map(status => {
+            return { name: status.name, color: status.color }
+        });
+
+///        console.log(allLeads)
+        let formatted = formatData(allLeads);
+        let mixed = formatted.map((obj, index) => {
+            obj['statusName'] = leadsStatusesObjs[index].name
+            obj['statusColor'] = leadsStatusesObjs[index].color
+            return obj;
+        });
+
+        result = JSON.stringify(mixed);
+    } catch (e) {
+        console.log(e);
+        result = new errors.HttpError(500).toString();
+    } finally {
+///        res.end(JSON.stringify(result));
+        res.end(result);
+    }
 }
